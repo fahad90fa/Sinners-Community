@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Camera } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import MFAChallenge from "@/components/MFAChallenge";
-import { SiDiscord } from "react-icons/si";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -15,7 +14,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [mfaRequired, setMfaRequired] = useState(false);
   const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
-  const { signIn, signInWithDiscord, user } = useAuth();
+  const { signIn, user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -113,25 +112,7 @@ const Login = () => {
               {loading ? "Logging in..." : "Log In"}
             </Button>
             
-            <div className="relative my-6">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-border" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">Or</span>
-              </div>
-            </div>
 
-            <Button 
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={() => signInWithDiscord()}
-              disabled={loading}
-            >
-              <SiDiscord className="mr-2 h-4 w-4" />
-              Login with Discord
-            </Button>
 
             <div className="text-center text-sm">
               <a href="#" className="text-primary hover:underline">Forgot password?</a>

@@ -12,7 +12,6 @@ interface AuthContextType {
   loading: boolean;
   signUp: (email: string, password: string, username: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null; mfaRequired?: boolean; factorId?: string }>;
-  signInWithDiscord: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -24,72 +23,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const setupProfileFromDiscord = async (userId: string, discordUser: any) => {
-    try {
-      const discordAvatarUrl = discordUser.avatar 
-        ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`
-        : null;
-
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: userId,
-          username: discordUser.username || `user_${userId.substring(0, 8)}`,
-          display_name: discordUser.global_name || discordUser.username || 'User',
-          avatar_url: discordAvatarUrl,
-          bio: discordUser.bio || null,
-          is_private: false
-        }, {
-          onConflict: 'id'
-        });
-
-      if (profileError) {
-        console.error('Error setting up profile from Discord:', profileError);
-      }
-    } catch (err) {
-      console.error('Error setting up profile from Discord:', err);
-    }
-  };
-
-  const saveDiscordToken = async (userId: string, discordUser: any) => {
-    try {
-      console.log('Saving Discord token for user:', userId, 'Discord user:', discordUser);
-      
-      const { data, error } = await supabase
-        .from('discord_tokens')
-        .upsert({
-          user_id: userId,
-          discord_user_id: discordUser.id,
-          discord_username: discordUser.username,
-          discord_email: discordUser.email,
-          avatar_url: discordUser.avatar ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png` : null,
-          raw_user_meta_data: discordUser
-        }, {
-          onConflict: 'user_id'
-        });
-
-      if (error) {
-        console.error('Error saving Discord token:', error);
-        toast({
-          title: "Discord token save failed",
-          description: error.message,
-          variant: "destructive"
-        });
-      } else {
-        console.log('Discord token saved successfully:', data);
-      }
-
-      await setupProfileFromDiscord(userId, discordUser);
-    } catch (err) {
-      console.error('Error saving Discord token:', err);
-      toast({
-        title: "Discord token error",
-        description: err instanceof Error ? err.message : "Unknown error",
-        variant: "destructive"
-      });
-    }
-  };
-
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -97,15 +30,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
-
-        if (event === 'SIGNED_IN' && session?.user) {
-          const provider = session.user.user_metadata?.provider;
-          if (provider === 'discord') {
-            const discordUser = session.user.user_metadata;
-            console.log('Discord user metadata:', discordUser);
-            saveDiscordToken(session.user.id, discordUser);
-          }
-        }
       }
     );
 
@@ -207,33 +131,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const signInWithDiscord = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'discord',
-        options: {
-          redirectTo: `${window.location.origin}/feed`,
-          scopes: ['identify', 'email']
-        }
-      });
-
-      if (error) {
-        toast({
-          title: "Discord login failed",
-          description: error.message,
-          variant: "destructive"
-        });
-      }
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error("Unknown error");
-      toast({
-        title: "Discord login failed",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  };
-
   const signOut = async () => {
     await supabase.auth.signOut();
     toast({
@@ -243,7 +140,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signInWithDiscord, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

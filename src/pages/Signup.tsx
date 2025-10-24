@@ -6,7 +6,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Camera } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { SiDiscord } from "react-icons/si";
 
 const Signup = () => {
   const [username, setUsername] = useState("");
@@ -14,7 +13,7 @@ const Signup = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const { signUp, signInWithDiscord, user } = useAuth();
+  const { signUp, user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -121,25 +120,7 @@ const Signup = () => {
               {loading ? "Creating account..." : "Sign Up"}
             </Button>
 
-            <div className="relative my-6">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-border" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">Or</span>
-              </div>
-            </div>
 
-            <Button 
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={() => signInWithDiscord()}
-              disabled={loading}
-            >
-              <SiDiscord className="mr-2 h-4 w-4" />
-              Sign up with Discord
-            </Button>
             
             <p className="text-xs text-center text-muted-foreground">
               By signing up, you agree to our Terms, Privacy Policy and Cookies Policy.
