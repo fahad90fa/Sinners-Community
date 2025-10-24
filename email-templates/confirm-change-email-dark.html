@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirm Email Change - Sinners</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background: #0a0a0a;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #1a1a1a;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 2px solid #ff0000;
+            box-shadow: 0 0 30px rgba(255, 0, 0, 0.3), 0 0 60px rgba(0, 0, 0, 0.8);
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%);
+            border-bottom: 3px solid #ff0000;
+            padding: 50px 20px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: repeating-linear-gradient(
+                90deg,
+                transparent,
+                transparent 2px,
+                rgba(255, 0, 0, 0.1) 2px,
+                rgba(255, 0, 0, 0.1) 4px
+            );
+            pointer-events: none;
+        }
+        
+        .header h1 {
+            font-size: 32px;
+            color: #ff0000;
+            margin-bottom: 5px;
+            font-weight: 900;
+            letter-spacing: 2px;
+            text-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+            position: relative;
+            z-index: 1;
+            text-transform: uppercase;
+        }
+        
+        .header p {
+            font-size: 12px;
+            color: #999;
+            letter-spacing: 1px;
+            position: relative;
+            z-index: 1;
+            text-transform: uppercase;
+        }
+        
+        .content {
+            padding: 40px 30px;
+            text-align: center;
+            background: #1a1a1a;
+        }
+        
+        .content h2 {
+            color: #ff0000;
+            font-size: 24px;
+            margin-bottom: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        
+        .subtitle {
+            color: #ff4444;
+            font-size: 13px;
+            letter-spacing: 1px;
+            margin-bottom: 25px;
+            text-transform: uppercase;
+        }
+        
+        .content p {
+            color: #ccc;
+            font-size: 15px;
+            line-height: 1.8;
+            margin-bottom: 15px;
+        }
+        
+        .highlight-text {
+            color: #ff0000;
+            font-weight: 700;
+        }
+        
+        .email-box {
+            background: rgba(255, 0, 0, 0.1);
+            border: 2px solid #ff0000;
+            border-radius: 4px;
+            padding: 25px;
+            margin: 25px 0;
+        }
+        
+        .email-row {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 0, 0, 0.3);
+        }
+        
+        .email-row:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+        
+        .email-label {
+            color: #ff8888;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+            font-weight: 700;
+        }
+        
+        .email-value {
+            color: #fff;
+            font-size: 16px;
+            font-weight: 600;
+            word-break: break-all;
+            font-family: monospace;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px 12px;
+            border-radius: 3px;
+        }
+        
+        .arrow {
+            color: #ff0000;
+            font-size: 18px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        
+        .cta-section {
+            margin: 40px 0;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            background: #ff0000;
+            color: white !important;
+            padding: 18px 50px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 15px;
+            letter-spacing: 1px;
+            transition: all 0.3s;
+            border: 2px solid #ff0000;
+            text-transform: uppercase;
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+        }
+        
+        .cta-button:hover {
+            background: transparent;
+            color: #ff0000 !important;
+            box-shadow: 0 0 30px rgba(255, 0, 0, 0.8);
+        }
+        
+        .divider {
+            height: 2px;
+            background: linear-gradient(to right, transparent, #ff0000, transparent);
+            margin: 30px 0;
+        }
+        
+        .backup-link {
+            margin-top: 25px;
+            padding: 20px;
+            background: rgba(255, 0, 0, 0.05);
+            border-left: 4px solid #ff0000;
+            border-radius: 4px;
+        }
+        
+        .backup-link p {
+            font-size: 13px;
+            color: #999;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .backup-link a {
+            color: #ff0000;
+            word-break: break-all;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 12px;
+        }
+        
+        .warning-box {
+            background: rgba(255, 0, 0, 0.1);
+            border: 1px solid #ff0000;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        
+        .warning-box p {
+            color: #ff8888;
+            font-size: 13px;
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .footer {
+            background: #0a0a0a;
+            padding: 30px;
+            text-align: center;
+            border-top: 2px solid #ff0000;
+        }
+        
+        .footer-logo {
+            font-size: 20px;
+            font-weight: 900;
+            color: #ff0000;
+            margin-bottom: 15px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            text-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+        }
+        
+        .footer p {
+            color: #777;
+            font-size: 12px;
+            line-height: 1.8;
+            margin: 5px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .footer a {
+            color: #ff0000;
+            text-decoration: none;
+            font-weight: 700;
+        }
+        
+        .icon {
+            display: inline-block;
+            font-size: 50px;
+            margin-bottom: 15px;
+            filter: drop-shadow(0 0 10px rgba(255, 0, 0, 0.5));
+        }
+        
+        @media (max-width: 600px) {
+            .content {
+                padding: 30px 20px;
+            }
+            
+            .header {
+                padding: 35px 20px;
+            }
+            
+            .header h1 {
+                font-size: 26px;
+            }
+            
+            .content h2 {
+                font-size: 20px;
+            }
+            
+            .cta-button {
+                padding: 15px 40px;
+                font-size: 14px;
+            }
+            
+            .email-box {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>⚡ SINNERS ⚡</h1>
+            <p>Confirm Email Update</p>
+        </div>
+        
+        <!-- Content -->
+        <div class="content">
+            <div class="icon">🔐</div>
+            
+            <h2>Confirm Email Change</h2>
+            <div class="subtitle">Verify Your New Email Address</div>
+            
+            <p>You've requested to update your email on <span class="highlight-text">SINNERS</span>. Confirm this change to proceed.</p>
+            
+            <!-- Email Details -->
+            <div class="email-box">
+                <div class="email-row">
+                    <div class="email-label">Current Email:</div>
+                    <div class="email-value">{{ .Email }}</div>
+                </div>
+                
+                <div class="arrow">⬇</div>
+                
+                <div class="email-row">
+                    <div class="email-label">New Email:</div>
+                    <div class="email-value">{{ .NewEmail }}</div>
+                </div>
+            </div>
+            
+            <!-- Warning Box -->
+            <div class="warning-box">
+                <p>⚠️ This action cannot be undone. Confirm only if this email change is legitimate.</p>
+            </div>
+            
+            <!-- CTA Button -->
+            <div class="cta-section">
+                <a href="{{ .ConfirmationURL }}" class="cta-button">Confirm Email Change</a>
+            </div>
+            
+            <!-- Divider -->
+            <div class="divider"></div>
+            
+            <p style="font-size: 13px; color: #999;">
+                This link expires in <span class="highlight-text">24 hours</span>.
+            </p>
+            
+            <!-- Backup Link -->
+            <div class="backup-link">
+                <p>Copy this link if the button fails:</p>
+                <a href="{{ .ConfirmationURL }}">{{ .ConfirmationURL }}</a>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <div class="footer-logo">⚡ SINNERS ⚡</div>
+            <p>If you didn't request this change, secure your account immediately.</p>
+            <p>© 2025 SINNERS NETWORK. No Rules. No Limits.</p>
+            <p style="margin-top: 15px;">
+                <a href="https://sinners.com/support">SUPPORT</a> | 
+                <a href="https://sinners.com/terms">TERMS</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
