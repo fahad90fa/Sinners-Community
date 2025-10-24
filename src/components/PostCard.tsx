@@ -817,7 +817,7 @@ const PostCard = ({
                           )}
                         </div>
                         <div className="text-sm text-foreground whitespace-pre-wrap break-words">
-                          {comment.text.split(/(@[\w]+)/g).map((part, i) => 
+                          {comment.text.split(/(@[\w]+)/g).map((part, i) => (
                             part.startsWith('@') ? (
                               <a
                                 key={i}
@@ -829,7 +829,7 @@ const PostCard = ({
                             ) : (
                               <span key={i}>{part}</span>
                             )
-                          )}
+                          ))}
                         </div>
                       </div>
                     </div>

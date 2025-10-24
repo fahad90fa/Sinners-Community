@@ -40,7 +40,7 @@ const AppRoutes = () => {
 
     const timeout = setTimeout(() => {
       setIsTransitioning(false);
-    }, 4000);
+    }, 1000);
 
     return () => {
       clearTimeout(timeout);

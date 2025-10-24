@@ -12,10 +12,28 @@
     <meta property="og:type" content="website" />
     
     <link rel="icon" type="image/gif" href="/sinners.gif" />
+    
+    <style>
+      @keyframes faviconSpin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      
+      #favicon {
+        animation: faviconSpin 1s linear infinite;
+        display: inline-block;
+      }
+    </style>
   </head>
 
   <body>
     <div id="root"></div>
+    <script>
+      const favicon = document.querySelector('link[rel="icon"]');
+      if (favicon) {
+        favicon.style.animation = 'faviconSpin 1s linear infinite';
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
