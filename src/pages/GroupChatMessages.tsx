@@ -95,14 +95,14 @@ const GroupChatMessages = () => {
 
         const { data: messagesData, error: messagesError } = await supabase
           .from("group_messages")
-          .select("id, sender_id, content, created_at")
+          .select("id, user_id, content, created_at")
           .eq("group_chat_id", groupId)
           .order("created_at", { ascending: true })
           .limit(50);
 
         if (messagesError) throw messagesError;
 
-        const senderIds = Array.from(new Set((messagesData || []).map((m) => m.sender_id)));
+        const senderIds = Array.from(new Set((messagesData || []).map((m) => m.user_id)));
         const { data: senderProfiles } = await supabase
           .from("profiles")
           .select("id, username, avatar_url")
@@ -111,10 +111,10 @@ const GroupChatMessages = () => {
         const profileMap = new Map(senderProfiles?.map((p) => [p.id, p]));
 
         const formattedMessages: GroupMessage[] = (messagesData || []).map((msg) => {
-          const profile = profileMap.get(msg.sender_id);
+          const profile = profileMap.get(msg.user_id);
           return {
             id: msg.id,
-            sender_id: msg.sender_id,
+            sender_id: msg.user_id,
             sender_name: profile?.username || "Unknown",
             sender_avatar: profile?.avatar_url || null,
             content: msg.content,
@@ -199,7 +199,7 @@ const GroupChatMessages = () => {
         .insert({
           id: messageId,
           group_chat_id: groupId,
-          sender_id: user.id,
+          user_id: user.id,
           content: messageInput.trim(),
         });
 
