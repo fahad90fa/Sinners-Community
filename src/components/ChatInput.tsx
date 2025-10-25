@@ -84,22 +84,30 @@ const ChatInput = ({ onSendMessage, isLoading = false, placeholder = "Type a mes
       const fileName = `voice-${crypto.randomUUID()}.webm`;
       const filePath = `voice-messages/${fileName}`;
 
-      const { error: uploadError, data } = await supabase.storage.from("posts").upload(filePath, audioBlob, {
+      const { error: uploadError } = await supabase.storage.from("posts").upload(filePath, audioBlob, {
         cacheControl: "3600",
         contentType: "audio/webm",
       });
 
       if (uploadError) {
         console.error("Upload error:", uploadError);
-        onSendMessage("🎤 [Voice Message Sent]");
+        toast({
+          title: "Upload failed",
+          description: "Failed to upload voice message. Please try again.",
+          variant: "destructive",
+        });
         return;
       }
 
       const { data: publicUrlData } = supabase.storage.from("posts").getPublicUrl(filePath);
-      onSendMessage("🎤 [Voice Message Sent]", publicUrlData.publicUrl, "voice");
+      onSendMessage("🎤 [Voice Message]", publicUrlData.publicUrl, "audio/webm");
     } catch (error) {
       console.error("Voice upload error:", error);
-      onSendMessage("🎤 [Voice Message Sent]");
+      toast({
+        title: "Recording error",
+        description: "Failed to process voice message.",
+        variant: "destructive",
+      });
     } finally {
       setUploadingFile(false);
     }
@@ -125,12 +133,16 @@ const ChatInput = ({ onSendMessage, isLoading = false, placeholder = "Type a mes
 
       const { error: uploadError } = await supabase.storage.from("posts").upload(filePath, file, {
         cacheControl: "3600",
-        contentType: file.type,
+        contentType: file.type || "application/octet-stream",
       });
 
       if (uploadError) {
         console.error("Upload error:", uploadError);
-        onSendMessage(`📎 [File: ${file.name}]`);
+        toast({
+          title: "Upload failed",
+          description: `Failed to upload ${file.name}. Please try again.`,
+          variant: "destructive",
+        });
         if (fileInputRef.current) {
           fileInputRef.current.value = "";
         }
@@ -138,13 +150,21 @@ const ChatInput = ({ onSendMessage, isLoading = false, placeholder = "Type a mes
       }
 
       const { data: publicUrlData } = supabase.storage.from("posts").getPublicUrl(filePath);
-      onSendMessage(`📎 [File: ${file.name}]`, publicUrlData.publicUrl, file.type);
+      onSendMessage(`📎 [File: ${file.name}]`, publicUrlData.publicUrl, file.type || "application/octet-stream");
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
+      toast({
+        title: "File uploaded",
+        description: `${file.name} has been sent successfully.`,
+      });
     } catch (error) {
       console.error("File upload error:", error);
-      onSendMessage(`📎 [File sent]`);
+      toast({
+        title: "Upload error",
+        description: "An error occurred while uploading the file.",
+        variant: "destructive",
+      });
     } finally {
       setUploadingFile(false);
     }

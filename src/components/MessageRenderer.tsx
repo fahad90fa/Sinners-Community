@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Play, Pause, Download } from "lucide-react";
+import { Play, Pause, Download, File } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface MessageRendererProps {
@@ -12,8 +12,18 @@ const MessageRenderer = ({ content, fileUrl, fileType }: MessageRendererProps) =
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioRef, setAudioRef] = useState<HTMLAudioElement | null>(null);
 
+  const getFileNameFromContent = (text: string): string => {
+    const match = text.match(/\[(?:Voice Message|File): (.+?)\]/);
+    return match ? match[1] : "Download file";
+  };
+
+  const isImageFile = fileType?.startsWith("image") || 
+    /\.(png|jpg|jpeg|gif|webp|svg|bmp)$/i.test(fileUrl || "");
+  const isVideoFile = fileType?.startsWith("video") || 
+    /\.(mp4|webm|ogg|mov|avi|mkv|flv)$/i.test(fileUrl || "");
+  const isAudioFile = fileType?.startsWith("audio") || fileType === "voice" ||
+    /\.(mp3|wav|ogg|aac|m4a|flac|webm)$/i.test(fileUrl || "");
   const isVoiceMessage = content.includes("[Voice Message");
-  const isFile = content.includes("[File:");
 
   const handlePlayPause = async () => {
     if (!audioRef) return;
@@ -34,49 +44,24 @@ const MessageRenderer = ({ content, fileUrl, fileType }: MessageRendererProps) =
     setIsPlaying(false);
   };
 
-  const isImageFile = fileType?.startsWith("image");
-  const isVideoFile = fileType?.startsWith("video");
-  const isAudioFile = fileType?.startsWith("audio") || fileType === "voice";
+  const extractFileName = (): string => {
+    if (isVoiceMessage) return "Voice Message";
+    const match = content.match(/\[File: (.+?)\]/);
+    return match ? match[1] : "File";
+  };
 
   return (
     <div className="space-y-2 w-full">
-      <div className="break-words">{content}</div>
-
-      {fileUrl && isVoiceMessage && (
-        <div className="bg-background/40 rounded-lg p-3 flex items-center gap-2">
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8 flex-shrink-0"
-            onClick={handlePlayPause}
-          >
-            {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-          </Button>
-          <audio
-            ref={setAudioRef}
-            src={fileUrl}
-            onEnded={handleAudioEnded}
-            className="flex-1 h-6"
-          />
-          <a
-            href={fileUrl}
-            download
-            className="flex-shrink-0"
-            title="Download voice message"
-          >
-            <Button size="icon" variant="ghost" className="h-8 w-8">
-              <Download className="h-4 w-4" />
-            </Button>
-          </a>
-        </div>
+      {!isImageFile && !isVideoFile && !isAudioFile && (
+        <div className="break-words">{content}</div>
       )}
 
       {fileUrl && isImageFile && (
         <div className="rounded-lg overflow-hidden max-w-sm">
           <img
             src={fileUrl}
-            alt="Message image"
-            className="w-full h-auto object-cover rounded-lg max-h-64"
+            alt={extractFileName()}
+            className="w-full h-auto object-cover rounded-lg max-h-80"
           />
         </div>
       )}
@@ -86,20 +71,54 @@ const MessageRenderer = ({ content, fileUrl, fileType }: MessageRendererProps) =
           <video
             src={fileUrl}
             controls
-            className="w-full h-auto object-cover rounded-lg max-h-64"
+            className="w-full h-auto object-cover rounded-lg max-h-80"
           />
         </div>
       )}
 
-      {fileUrl && isFile && !isImageFile && !isVideoFile && !isAudioFile && (
-        <div className="bg-background/40 rounded-lg p-3 flex items-center justify-between">
-          <div className="flex-1 truncate">
-            <p className="text-sm text-muted-foreground truncate">{content}</p>
+      {fileUrl && isAudioFile && (
+        <div className="bg-background/40 rounded-lg p-3 flex items-center gap-3 max-w-sm">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 flex-shrink-0"
+            onClick={handlePlayPause}
+          >
+            {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          </Button>
+          <div className="flex-1">
+            <audio
+              ref={setAudioRef}
+              src={fileUrl}
+              onEnded={handleAudioEnded}
+              className="w-full h-6"
+            />
+            <p className="text-xs text-muted-foreground mt-1">{extractFileName()}</p>
           </div>
           <a
             href={fileUrl}
             download
-            className="flex-shrink-0 ml-2"
+            className="flex-shrink-0"
+            title="Download audio"
+          >
+            <Button size="icon" variant="ghost" className="h-8 w-8">
+              <Download className="h-4 w-4" />
+            </Button>
+          </a>
+        </div>
+      )}
+
+      {fileUrl && !isImageFile && !isVideoFile && !isAudioFile && (
+        <div className="bg-background/40 rounded-lg p-3 flex items-center gap-3 max-w-sm">
+          <File className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+          <div className="flex-1 truncate">
+            <p className="text-sm truncate">{extractFileName()}</p>
+          </div>
+          <a
+            href={fileUrl}
+            download
+            className="flex-shrink-0"
+            title="Download file"
           >
             <Button size="icon" variant="ghost" className="h-8 w-8">
               <Download className="h-4 w-4" />
