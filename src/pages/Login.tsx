@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Camera } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import MFAChallenge from "@/components/MFAChallenge";
+import { supabase } from "@/integrations/supabase/client";
+import { getGeolocation, getDeviceInfo } from "@/utils/geolocation";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -37,6 +39,28 @@ const Login = () => {
     }
     
     if (!error) {
+      try {
+        const user = await supabase.auth.getUser();
+        if (user.data.user?.id) {
+          const geolocation = await getGeolocation();
+          const deviceInfo = getDeviceInfo();
+          
+          await supabase.rpc("create_login_notification", {
+            p_user_id: user.data.user.id,
+            p_ip_address: geolocation?.ip || "Unknown",
+            p_country: geolocation?.country || "Unknown",
+            p_city: geolocation?.city || "Unknown",
+            p_latitude: geolocation?.latitude || 0,
+            p_longitude: geolocation?.longitude || 0,
+            p_device_name: deviceInfo.deviceName,
+            p_browser_name: deviceInfo.browserName,
+            p_os_name: deviceInfo.osName,
+          });
+        }
+      } catch (notifError) {
+        console.error("Failed to record login notification:", notifError);
+      }
+      
       navigate("/feed");
     }
     
