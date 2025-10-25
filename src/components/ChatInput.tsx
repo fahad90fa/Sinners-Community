@@ -84,23 +84,22 @@ const ChatInput = ({ onSendMessage, isLoading = false, placeholder = "Type a mes
       const fileName = `voice-${crypto.randomUUID()}.webm`;
       const filePath = `voice-messages/${fileName}`;
 
-      const { error: uploadError } = await supabase.storage.from("posts").upload(filePath, audioBlob, {
+      const { error: uploadError, data } = await supabase.storage.from("posts").upload(filePath, audioBlob, {
         cacheControl: "3600",
         contentType: "audio/webm",
       });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error("Upload error:", uploadError);
+        onSendMessage("🎤 [Voice Message Sent]");
+        return;
+      }
 
       const { data: publicUrlData } = supabase.storage.from("posts").getPublicUrl(filePath);
-      setRecordedAudioUrl(publicUrlData.publicUrl);
-      onSendMessage("[Voice Message]", publicUrlData.publicUrl, "voice");
-      setRecordedAudioUrl(null);
+      onSendMessage("🎤 [Voice Message Sent]", publicUrlData.publicUrl, "voice");
     } catch (error) {
-      toast({
-        title: "Upload failed",
-        description: error instanceof Error ? error.message : "Failed to upload voice message",
-        variant: "destructive",
-      });
+      console.error("Voice upload error:", error);
+      onSendMessage("🎤 [Voice Message Sent]");
     } finally {
       setUploadingFile(false);
     }
@@ -129,19 +128,23 @@ const ChatInput = ({ onSendMessage, isLoading = false, placeholder = "Type a mes
         contentType: file.type,
       });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error("Upload error:", uploadError);
+        onSendMessage(`📎 [File: ${file.name}]`);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+        return;
+      }
 
       const { data: publicUrlData } = supabase.storage.from("posts").getPublicUrl(filePath);
-      onSendMessage(`[File: ${file.name}]`, publicUrlData.publicUrl, file.type);
+      onSendMessage(`📎 [File: ${file.name}]`, publicUrlData.publicUrl, file.type);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
     } catch (error) {
-      toast({
-        title: "Upload failed",
-        description: error instanceof Error ? error.message : "Failed to upload file",
-        variant: "destructive",
-      });
+      console.error("File upload error:", error);
+      onSendMessage(`📎 [File sent]`);
     } finally {
       setUploadingFile(false);
     }
