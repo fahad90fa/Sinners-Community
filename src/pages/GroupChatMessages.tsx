@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import ChatInput from "@/components/ChatInput";
+import MessageRenderer from "@/components/MessageRenderer";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -17,6 +18,8 @@ interface GroupMessage {
   sender_avatar: string | null;
   content: string;
   created_at: string;
+  file_url?: string | null;
+  file_type?: string;
 }
 
 interface GroupMember {
@@ -183,20 +186,15 @@ const GroupChatMessages = () => {
       const senderName = profileData?.username || user.user_metadata?.username || user.email || "Unknown";
       const senderAvatar = profileData?.avatar_url || null;
 
-      let messageContent = content;
-      if (fileUrl && fileType?.startsWith("voice")) {
-        messageContent = "[Voice Message]";
-      } else if (fileUrl) {
-        messageContent = content;
-      }
-
       const newMessage: GroupMessage = {
         id: messageId,
         sender_id: user.id,
         sender_name: senderName,
         sender_avatar: senderAvatar,
-        content: messageContent,
+        content: content,
         created_at: new Date().toISOString(),
+        file_url: fileUrl,
+        file_type: fileType,
       };
 
       const { error } = await supabase
@@ -205,7 +203,7 @@ const GroupChatMessages = () => {
           id: messageId,
           group_chat_id: groupId,
           user_id: user.id,
-          content: messageContent,
+          content: content,
         });
 
       if (error) throw error;
@@ -293,7 +291,13 @@ const GroupChatMessages = () => {
                             })}
                           </span>
                         </div>
-                        <p className="text-sm text-foreground break-words">{message.content}</p>
+                        <div className="text-sm text-foreground">
+                          <MessageRenderer 
+                            content={message.content} 
+                            fileUrl={message.file_url}
+                            fileType={message.file_type}
+                          />
+                        </div>
                       </div>
                     </div>
                   ))
