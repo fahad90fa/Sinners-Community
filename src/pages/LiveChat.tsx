@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import ChatInput from "@/components/ChatInput";
 import MessageRenderer from "@/components/MessageRenderer";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getGroupChats } from "@/utils/groupChat";
@@ -42,6 +43,7 @@ interface PresencePayload {
 const LiveChat = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
   const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
@@ -288,10 +290,13 @@ const LiveChat = () => {
     }
 
     return messages.filter((message) => {
-      if (message.userId === user?.id) {
-        return message.recipientId === selectedRecipient.id;
+      const isSentByMe = message.userId === user?.id;
+      const isFromSelectedUser = message.userId === selectedRecipient.id;
+      
+      if (isSentByMe) {
+        return message.recipientId === selectedRecipient.id || selectedRecipient.id === message.recipientId;
       }
-      return message.userId === selectedRecipient.id && message.recipientId === user?.id;
+      return isFromSelectedUser && (message.recipientId === user?.id || user?.id === message.recipientId);
     });
   }, [messages, selectedRecipient, user?.id]);
 
@@ -300,45 +305,56 @@ const LiveChat = () => {
 
     try {
       const { data: existingConv } = await supabase
-        .from("conversations")
-        .select("id")
-        .eq("is_group", false)
-        .limit(1);
+        .from("conversation_members")
+        .select("conversation_id")
+        .eq("user_id", user.id);
 
       let conversationId: string | null = null;
 
       if (existingConv && existingConv.length > 0) {
-        for (const conv of existingConv) {
+        for (const item of existingConv) {
           const { data: members } = await supabase
             .from("conversation_members")
             .select("user_id")
-            .eq("conversation_id", conv.id);
+            .eq("conversation_id", item.conversation_id);
 
           const userIds = members?.map((m) => m.user_id) || [];
-          if (userIds.includes(user.id) && userIds.includes(recipientId) && userIds.length === 2) {
-            conversationId = conv.id;
+          if (userIds.includes(recipientId) && userIds.length === 2) {
+            conversationId = item.conversation_id;
             break;
           }
         }
       }
 
       if (!conversationId) {
-        const { data: newConv } = await supabase
+        console.log("Creating new conversation...");
+        const { data: newConv, error: convError } = await supabase
           .from("conversations")
           .insert({ is_group: false })
           .select("id")
           .single();
 
+        if (convError) {
+          console.error("Conversation creation error:", convError);
+          return null;
+        }
+
         if (newConv) {
           conversationId = newConv.id;
 
-          await supabase.from("conversation_members").insert([
+          const { error: membersError } = await supabase.from("conversation_members").insert([
             { conversation_id: conversationId, user_id: user.id },
             { conversation_id: conversationId, user_id: recipientId },
           ]);
+
+          if (membersError) {
+            console.error("Members creation error:", membersError);
+            return null;
+          }
         }
       }
 
+      console.log("Conversation ID:", conversationId);
       return conversationId;
     } catch (error) {
       console.error("Error with conversation:", error);
@@ -383,18 +399,39 @@ const LiveChat = () => {
   };
 
   const handleSendMessage = async (content: string, fileUrl?: string | null, fileType?: string) => {
+    console.log("handleSendMessage called with:", { content, fileUrl, fileType, selectedRecipient });
+    
     if (!content.trim() || !user) {
+      console.log("Validation failed: empty content or no user");
+      toast({
+        title: "Error",
+        description: "Cannot send empty message",
+        variant: "destructive",
+      });
       return;
     }
 
     if (!selectedRecipient) {
+      console.log("No recipient selected");
+      toast({
+        title: "Error",
+        description: "Please select a user to message",
+        variant: "destructive",
+      });
       return;
     }
 
     try {
+      console.log("Getting/creating conversation...");
       const conversationId = await getOrCreateConversation(selectedRecipient.id);
+      console.log("Conversation ID:", conversationId);
+      
       if (!conversationId) {
-        console.error("Failed to create/get conversation");
+        toast({
+          title: "Error",
+          description: "Failed to create conversation",
+          variant: "destructive",
+        });
         return;
       }
 
@@ -405,6 +442,7 @@ const LiveChat = () => {
         fileType,
       };
 
+      console.log("Inserting message to DB...");
       const { error: dbError } = await supabase.from("messages").insert({
         id: messageId,
         conversation_id: conversationId,
@@ -416,7 +454,15 @@ const LiveChat = () => {
 
       if (dbError) {
         console.error("Database error:", dbError);
+        toast({
+          title: "Database Error",
+          description: dbError.message,
+          variant: "destructive",
+        });
+        return;
       }
+
+      console.log("Message inserted successfully");
 
       const payload: ChatMessage = {
         id: messageId,
@@ -429,6 +475,7 @@ const LiveChat = () => {
         fileType: fileType,
       };
 
+      console.log("Updating local messages state...");
       setMessages((prev) => {
         const next = [...prev, payload];
         next.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
@@ -441,9 +488,21 @@ const LiveChat = () => {
         return next;
       });
 
+      console.log("Broadcasting message via realtime...");
       await sendLiveChatMessage(payload);
+      console.log("Message broadcast complete");
+      
+      toast({
+        title: "Message sent",
+        description: `Message sent to ${selectedRecipient.username}`,
+      });
     } catch (error) {
       console.error("Error sending message:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to send message",
+        variant: "destructive",
+      });
     }
   };
 
@@ -644,8 +703,8 @@ const LiveChat = () => {
 
               <ChatInput
                 onSendMessage={handleSendMessage}
-                isLoading={false}
-                placeholder={selectedRecipient ? "Type your message..." : "Select a user first"}
+                isLoading={!selectedRecipient}
+                placeholder={selectedRecipient ? `Message ${selectedRecipient.username}...` : "Select a user to chat"}
               />
             </section>
           </div>
