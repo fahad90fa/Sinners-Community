@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Flame, UserPlus, UserCheck } from "lucide-react";
+import { Search, Flame, UserPlus, UserCheck, Heart, MessageCircle, Share2, X } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -15,11 +15,13 @@ interface ExplorePost {
   caption: string | null;
   created_at: string;
   user_id: string;
-  media: Array<{ url: string }>;
+  media: Array<{ url: string; type?: string }>;
   likes: Array<{ user_id: string }>;
+  comments?: Array<any>;
   profiles?: {
     username: string;
     avatar_url: string | null;
+    display_name?: string | null;
   };
 }
 
@@ -46,6 +48,8 @@ const Explore = () => {
   const [searchUsers, setSearchUsers] = useState<UserWithFollowStatus[]>([]);
   const [isSearchingUsers, setIsSearchingUsers] = useState(false);
   const [followingStates, setFollowingStates] = useState<Map<string, boolean>>(new Map());
+  const [selectedPost, setSelectedPost] = useState<ExplorePost | null>(null);
+  const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
 
   const checkIfFollowing = useCallback(async (followerId: string, followeeId: string): Promise<boolean> => {
     try {
@@ -113,7 +117,8 @@ const Explore = () => {
           ),
           likes (
             user_id
-          )
+          ),
+          comments (id)
         `)
         .eq("is_public", true)
         .order("created_at", { ascending: false })
@@ -123,12 +128,12 @@ const Explore = () => {
 
       if (data && data.length > 0) {
         const userIds = Array.from(new Set(data.map((post) => post.user_id)));
-        const profilesMap = new Map<string, { username: string; avatar_url: string | null }>();
+        const profilesMap = new Map<string, { username: string; avatar_url: string | null; display_name: string | null }>();
 
         if (userIds.length > 0) {
           const { data: profilesData, error: profilesError } = await supabase
             .from("profiles")
-            .select("id, username, avatar_url")
+            .select("id, username, avatar_url, display_name")
             .in("id", userIds);
 
           if (!profilesError && profilesData) {
@@ -136,6 +141,7 @@ const Explore = () => {
               profilesMap.set(profile.id, {
                 username: profile.username,
                 avatar_url: profile.avatar_url,
+                display_name: profile.display_name,
               });
             });
           }
@@ -146,10 +152,20 @@ const Explore = () => {
           profiles: profilesMap.get(post.user_id) ?? {
             username: "Unknown",
             avatar_url: null,
+            display_name: null,
           },
         })) as ExplorePost[];
 
         setPosts(postsWithProfiles);
+
+        if (user) {
+          const likedPostIds = new Set(
+            postsWithProfiles
+              .filter((post) => post.likes?.some((like) => like.user_id === user.id))
+              .map((post) => post.id)
+          );
+          setLikedPosts(likedPostIds);
+        }
       } else {
         setPosts([]);
       }
@@ -231,6 +247,79 @@ const Explore = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const toggleLike = async (postId: string) => {
+    if (!user) return;
+
+    try {
+      const isLiked = likedPosts.has(postId);
+
+      if (isLiked) {
+        const { error } = await supabase
+          .from("likes")
+          .delete()
+          .eq("post_id", postId)
+          .eq("user_id", user.id);
+
+        if (error) throw error;
+
+        setLikedPosts((prev) => {
+          const next = new Set(prev);
+          next.delete(postId);
+          return next;
+        });
+
+        setPosts((prev) =>
+          prev.map((post) =>
+            post.id === postId
+              ? {
+                  ...post,
+                  likes: post.likes?.filter((like) => like.user_id !== user.id) || [],
+                }
+              : post
+          )
+        );
+      } else {
+        const { error } = await supabase.from("likes").insert({
+          post_id: postId,
+          user_id: user.id,
+        });
+
+        if (error) throw error;
+
+        setLikedPosts((prev) => new Set(prev).add(postId));
+
+        setPosts((prev) =>
+          prev.map((post) =>
+            post.id === postId
+              ? {
+                  ...post,
+                  likes: [...(post.likes || []), { user_id: user.id }],
+                }
+              : post
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Error toggling like", error);
+      toast({
+        title: "Error",
+        description: "Failed to update like status.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const getMediaPreview = (url: string) => {
+    const ext = url.split('.').pop()?.toLowerCase();
+    if (['mp4', 'webm', 'mov', 'avi'].includes(ext || '')) {
+      return 'video';
+    }
+    if (['gif'].includes(ext || '')) {
+      return 'gif';
+    }
+    return 'image';
   };
 
   const filteredPosts = useMemo(() => {
@@ -365,20 +454,43 @@ const Explore = () => {
                 <Badge variant="outline">Updated hourly</Badge>
               </div>
               <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                {trendingPosts.map((post) => (
-                  <div key={`trending-${post.id}`} className="group relative overflow-hidden rounded-2xl bg-muted">
-                    <img
-                      src={post.media?.[0]?.url ?? "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=600&h=600&fit=crop"}
-                      alt={post.caption ?? "Post"}
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                    <div className="pointer-events-none absolute bottom-4 left-4 right-4 translate-y-4 space-y-1 text-sm text-white opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-                      <div className="font-semibold">{post.profiles?.username ?? "Unknown"}</div>
-                      {post.caption && <div className="line-clamp-2 text-xs text-white/80">{post.caption}</div>}
-                    </div>
-                  </div>
-                ))}
+                {trendingPosts.map((post) => {
+                  const mediaUrl = post.media?.[0]?.url ?? "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=600&h=600&fit=crop";
+                  const mediaType = getMediaPreview(mediaUrl);
+
+                  return (
+                    <button
+                      key={`trending-${post.id}`}
+                      onClick={() => setSelectedPost(post)}
+                      className="group relative overflow-hidden rounded-2xl bg-muted aspect-square cursor-pointer"
+                    >
+                      {mediaType === 'video' ? (
+                        <>
+                          <video
+                            src={mediaUrl}
+                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center">
+                              <div className="w-0 h-0 border-l-5 border-r-0 border-t-3 border-b-3 border-l-white border-t-transparent border-b-transparent ml-1" />
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <img
+                          src={mediaUrl}
+                          alt={post.caption ?? "Post"}
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                      )}
+                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                      <div className="pointer-events-none absolute bottom-4 left-4 right-4 translate-y-4 space-y-1 text-sm text-white opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+                        <div className="font-semibold">{post.profiles?.username ?? "Unknown"}</div>
+                        {post.caption && <div className="line-clamp-2 text-xs text-white/80">{post.caption}</div>}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </section>
           )}
@@ -399,31 +511,163 @@ const Explore = () => {
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
-                {filteredPosts.map((post) => (
-                  <div
-                    key={post.id}
-                    className="relative aspect-square overflow-hidden rounded-xl bg-muted"
-                  >
-                    <img
-                      src={post.media?.[0]?.url ?? "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=600&h=600&fit=crop"}
-                      alt={post.caption ?? "Post"}
-                      className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
-                    />
-                    <div className="absolute inset-0 flex flex-col justify-end gap-1 bg-gradient-to-t from-black/60 via-black/0 to-transparent p-3 opacity-0 transition-opacity duration-300 hover:opacity-100">
-                      <div className="text-xs font-semibold uppercase text-white/80">
-                        {new Date(post.created_at).toLocaleDateString()}
-                      </div>
-                      <div className="text-sm font-medium text-white">{post.profiles?.username ?? "Unknown"}</div>
-                      {post.caption && (
-                        <div className="line-clamp-2 text-xs text-white/70">{post.caption}</div>
+                {filteredPosts.map((post) => {
+                  const mediaUrl = post.media?.[0]?.url ?? "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=600&h=600&fit=crop";
+                  const mediaType = getMediaPreview(mediaUrl);
+
+                  return (
+                    <button
+                      key={post.id}
+                      onClick={() => setSelectedPost(post)}
+                      className="group relative aspect-square overflow-hidden rounded-xl bg-muted cursor-pointer"
+                    >
+                      {mediaType === 'video' ? (
+                        <>
+                          <video
+                            src={mediaUrl}
+                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="h-12 w-12 rounded-full bg-primary flex items-center justify-center">
+                              <div className="w-0 h-0 border-l-6 border-r-0 border-t-4 border-b-4 border-l-white border-t-transparent border-b-transparent ml-1" />
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <img
+                          src={mediaUrl}
+                          alt={post.caption ?? "Post"}
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
                       )}
-                    </div>
-                  </div>
-                ))}
+                      <div className="absolute inset-0 flex flex-col justify-end gap-1 bg-gradient-to-t from-black/60 via-black/0 to-transparent p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                        <div className="text-xs font-semibold uppercase text-white/80">
+                          {new Date(post.created_at).toLocaleDateString()}
+                        </div>
+                        <div className="text-sm font-medium text-white">{post.profiles?.username ?? "Unknown"}</div>
+                        {post.caption && (
+                          <div className="line-clamp-2 text-xs text-white/70">{post.caption}</div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </section>
         </div>
+
+        {selectedPost && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+            <div className="w-full max-w-6xl max-h-[90vh] flex bg-card rounded-2xl overflow-hidden">
+              {/* Media Section */}
+              <div className="flex-1 flex items-center justify-center bg-black min-w-0">
+                {selectedPost.media?.[0]?.url ? (
+                  getMediaPreview(selectedPost.media[0].url) === 'video' ? (
+                    <video
+                      src={selectedPost.media[0].url}
+                      controls
+                      autoPlay
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <img
+                      src={selectedPost.media[0].url}
+                      alt={selectedPost.caption ?? "Post"}
+                      className="w-full h-full object-contain"
+                    />
+                  )
+                ) : (
+                  <img
+                    src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=800&h=800&fit=crop"
+                    alt="Placeholder"
+                    className="w-full h-full object-contain"
+                  />
+                )}
+              </div>
+
+              {/* Info Section */}
+              <div className="w-full md:w-96 flex flex-col bg-card border-l border-border">
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-border p-4">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <Avatar className="h-10 w-10 flex-shrink-0">
+                      <AvatarImage src={selectedPost.profiles?.avatar_url || ""} />
+                      <AvatarFallback>{selectedPost.profiles?.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold truncate">{selectedPost.profiles?.display_name || selectedPost.profiles?.username}</div>
+                      <div className="text-xs text-muted-foreground">@{selectedPost.profiles?.username}</div>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedPost(null)}
+                    className="flex-shrink-0"
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
+
+                {/* Caption */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {selectedPost.caption && (
+                    <div className="text-sm">{selectedPost.caption}</div>
+                  )}
+
+                  {/* Stats */}
+                  <div className="grid grid-cols-3 gap-3 pt-4 border-t border-border">
+                    <div className="text-center">
+                      <div className="text-lg font-semibold">{selectedPost.likes?.length || 0}</div>
+                      <div className="text-xs text-muted-foreground">Likes</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-semibold">{selectedPost.comments?.length || 0}</div>
+                      <div className="text-xs text-muted-foreground">Comments</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-semibold">0</div>
+                      <div className="text-xs text-muted-foreground">Shares</div>
+                    </div>
+                  </div>
+
+                  {/* Date */}
+                  <div className="text-xs text-muted-foreground pt-4 border-t border-border">
+                    Posted {new Date(selectedPost.created_at).toLocaleDateString("en-US", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="border-t border-border p-4 flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleLike(selectedPost.id)}
+                    className={likedPosts.has(selectedPost.id) ? "text-red-500" : ""}
+                  >
+                    <Heart className={`h-4 w-4 mr-2 ${likedPosts.has(selectedPost.id) ? "fill-current" : ""}`} />
+                    Like
+                  </Button>
+                  <Button variant="ghost" size="sm">
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    Comment
+                  </Button>
+                  <Button variant="ghost" size="sm">
+                    <Share2 className="h-4 w-4 mr-2" />
+                    Share
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
