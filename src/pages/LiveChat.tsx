@@ -148,7 +148,7 @@ const LiveChat = () => {
       
       setTypingUsers((prev) => {
         const next = new Set(prev);
-        next.delete((payload as any).userId);
+        next.delete((payload as Record<string, unknown>).userId as string);
         return next;
       });
     });
@@ -170,15 +170,30 @@ const LiveChat = () => {
       }, 3000);
     });
 
-    channel.on("presence", { event: "sync" }, () => {
+    channel.on("presence", { event: "sync" }, async () => {
       const state = channel.presenceState<PresencePayload>();
       const onlineIds = new Set(Object.keys(state));
-      
-      setActiveUsers((prev) =>
-        prev.map((user) => ({
+
+      setActiveUsers((prev) => {
+        if (prev.length === 0) {
+          return prev;
+        }
+        return prev.map((user) => ({
           ...user,
           isOnline: onlineIds.has(user.id),
-        }))
+        }));
+      });
+    });
+
+    channel.on("presence", { event: "join" }, ({ key }) => {
+      setActiveUsers((prev) =>
+        prev.map((user) => (user.id === key ? { ...user, isOnline: true } : user))
+      );
+    });
+
+    channel.on("presence", { event: "leave" }, ({ key }) => {
+      setActiveUsers((prev) =>
+        prev.map((user) => (user.id === key ? { ...user, isOnline: false } : user))
       );
     });
 
@@ -214,11 +229,46 @@ const LiveChat = () => {
 
   useEffect(() => {
     if (selectedRecipient && !selectedRecipient.isSelf) {
-      void loadChatHistory(selectedRecipient.id);
+      void (async () => {
+        if (!user) return;
+        try {
+          const conversationId = await getOrCreateConversation(selectedRecipient.id);
+          if (!conversationId) return;
+
+          const { data: messages } = await supabase
+            .from("messages")
+            .select("id, sender_id, content, created_at, metadata")
+            .eq("conversation_id", conversationId)
+            .order("created_at", { ascending: true })
+            .limit(50);
+
+          if (messages) {
+            const formattedMessages: ChatMessage[] = messages.map((msg) => {
+              const metadata = (msg.metadata || {}) as Record<string, unknown>;
+              return {
+                id: msg.id,
+                userId: msg.sender_id,
+                username: (metadata.username as string) || "Unknown",
+                content: msg.content,
+                createdAt: msg.created_at,
+                recipientId: msg.sender_id === user.id ? selectedRecipient.id : user.id,
+                fileUrl: (metadata.fileUrl as string | null) || null,
+                fileType: (metadata.fileType as string) || undefined,
+              };
+            });
+
+            setMessages(formattedMessages);
+          }
+        } catch (error) {
+          console.error("Error loading chat history:", error);
+        }
+      })();
     } else {
       setMessages([]);
     }
-  }, [selectedRecipient?.id, user?.id]);
+  }, [selectedRecipient?.id, selectedRecipient?.isSelf, user?.id]);
+
+
 
   const sendLiveChatMessage = async (message: ChatMessage) => {
     if (!channelRef.current) {
