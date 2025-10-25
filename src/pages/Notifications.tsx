@@ -66,17 +66,14 @@ const Notifications = () => {
   const fetchNotifications = async () => {
     try {
       setIsFetching(true);
-      let query = supabase
+      const selectColumns = ["id", "type", "created_at", "is_read", "actor_user_id", "post_id", "comment_id"];
+      
+      const { data, error } = await supabase
         .from("notifications")
+        .select(selectColumns.join(", "))
         .eq("user_id", user?.id)
         .order("created_at", { ascending: false })
         .limit(100);
-
-      const selectColumns = ["id", "type", "created_at", "is_read", "actor_user_id", "post_id", "comment_id"];
-      
-      query = query.select(selectColumns.join(", "));
-
-      const { data, error } = await query;
 
       if (error) {
         console.error("Notification fetch error:", error);
