@@ -328,35 +328,23 @@ const LiveChat = () => {
 
       if (!conversationId) {
         console.log("Creating new conversation...");
-        const { data: newConv, error: convError } = await supabase
-          .from("conversations")
-          .insert({ is_group: false })
-          .select("id")
-          .single();
+        const { data, error } = await supabase
+          .rpc("create_conversation_with_members", {
+            p_is_group: false,
+            p_other_user_id: recipientId,
+          });
 
-        if (convError) {
-          console.error("Conversation creation error:", convError);
+        if (error) {
+          console.error("Conversation creation error:", error);
           return null;
         }
 
-        if (!newConv?.id) {
+        if (!data) {
           console.error("No conversation ID returned");
           return null;
         }
 
-        conversationId = newConv.id;
-
-        console.log("Inserting conversation members...");
-        const { error: membersError } = await supabase
-          .from("conversation_members")
-          .insert([
-            { conversation_id: conversationId, user_id: user.id },
-            { conversation_id: conversationId, user_id: recipientId },
-          ]);
-
-        if (membersError) {
-          console.error("Members creation error:", membersError.message);
-        }
+        conversationId = data;
       }
 
       console.log("Conversation ID:", conversationId);
