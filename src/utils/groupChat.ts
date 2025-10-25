@@ -9,36 +9,29 @@ export interface GroupChat {
 
 export async function createGroupChat(createdBy: string, name: string, memberIds: string[]): Promise<GroupChat> {
   try {
-    const { data: chatData, error: chatError } = await supabase
-      .from('group_chats')
-      .insert({
-        name,
-        created_by: createdBy,
-      })
-      .select('id, name, created_at, created_by')
-      .single();
+    const uniqueMemberIds = Array.from(new Set([createdBy, ...memberIds]));
+    
+    const { data: chatId, error } = await supabase
+      .rpc("create_group_chat", {
+        p_name: name,
+        p_created_by: createdBy,
+        p_member_ids: uniqueMemberIds,
+      });
 
-    if (chatError) {
-      throw new Error(`Failed to create group chat: ${chatError.message || JSON.stringify(chatError)}`);
+    if (error) {
+      throw new Error(`Failed to create group chat: ${error.message}`);
     }
+
+    const { data: chatData } = await supabase
+      .from("group_chats")
+      .select("id, name, created_at, created_by")
+      .eq("id", chatId)
+      .single();
 
     if (!chatData) {
       throw new Error('No data returned from group chat creation');
     }
 
-    const uniqueMemberIds = new Set([createdBy, ...memberIds]);
-    const membersToAdd = Array.from(uniqueMemberIds).map(id => ({
-      group_chat_id: chatData.id,
-      user_id: id,
-    }));
-
-    const { error: membersError } = await supabase
-      .from('group_chat_members')
-      .insert(membersToAdd);
-
-    if (membersError) {
-      throw new Error(`Failed to add members: ${membersError.message || JSON.stringify(membersError)}`);
-    }
     return chatData;
   } catch (error) {
     console.error('Error creating group chat:', error instanceof Error ? error.message : error);
