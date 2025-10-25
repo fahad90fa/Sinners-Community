@@ -31,6 +31,7 @@ interface ActiveUser {
   username: string;
   avatarUrl: string | null;
   isSelf: boolean;
+  isOnline: boolean;
 }
 
 interface PresencePayload {
@@ -87,10 +88,35 @@ const LiveChat = () => {
       }
     };
 
+    const loadAllUsers = async () => {
+      if (!user) return;
+      try {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, username, avatar_url");
+        
+        if (profiles) {
+          const allUsers: ActiveUser[] = profiles
+            .filter((p) => p.id !== user.id)
+            .map((p) => ({
+              id: p.id,
+              username: p.username,
+              avatarUrl: p.avatar_url as string | null,
+              isSelf: false,
+              isOnline: false,
+            }));
+          setActiveUsers(allUsers);
+        }
+      } catch (error) {
+        console.error("Error loading users:", error);
+      }
+    };
+
     if (!loading && !user) {
       navigate("/login");
     } else if (user) {
       void loadGroupChats();
+      void loadAllUsers();
     }
   }, [loading, user, navigate]);
 
@@ -146,23 +172,14 @@ const LiveChat = () => {
 
     channel.on("presence", { event: "sync" }, () => {
       const state = channel.presenceState<PresencePayload>();
-      const participants: ActiveUser[] = Object.entries(state).flatMap(([id, presences]) =>
-        presences.map((presence) => ({
-          id,
-          username: presence.username,
-          avatarUrl: presence.avatarUrl ?? null,
-          isSelf: id === user.id,
-        })),
+      const onlineIds = new Set(Object.keys(state));
+      
+      setActiveUsers((prev) =>
+        prev.map((user) => ({
+          ...user,
+          isOnline: onlineIds.has(user.id),
+        }))
       );
-      participants.sort((a, b) => a.username.localeCompare(b.username));
-      setActiveUsers(participants);
-      setSelectedRecipient((current) => {
-        if (!current) {
-          return null;
-        }
-        const match = participants.find((participant) => participant.id === current.id);
-        return match ?? null;
-      });
     });
 
     channel.subscribe((status) => {
@@ -195,6 +212,14 @@ const LiveChat = () => {
     }
   }, [messages]);
 
+  useEffect(() => {
+    if (selectedRecipient && !selectedRecipient.isSelf) {
+      void loadChatHistory(selectedRecipient.id);
+    } else {
+      setMessages([]);
+    }
+  }, [selectedRecipient?.id, user?.id]);
+
   const sendLiveChatMessage = async (message: ChatMessage) => {
     if (!channelRef.current) {
       return;
@@ -220,6 +245,93 @@ const LiveChat = () => {
     });
   }, [messages, selectedRecipient, user?.id]);
 
+  const getOrCreateConversation = async (recipientId: string) => {
+    if (!user) return null;
+
+    try {
+      const { data: existingConv } = await supabase
+        .from("conversations")
+        .select("id")
+        .eq("is_group", false)
+        .limit(1);
+
+      let conversationId: string | null = null;
+
+      if (existingConv && existingConv.length > 0) {
+        for (const conv of existingConv) {
+          const { data: members } = await supabase
+            .from("conversation_members")
+            .select("user_id")
+            .eq("conversation_id", conv.id);
+
+          const userIds = members?.map((m) => m.user_id) || [];
+          if (userIds.includes(user.id) && userIds.includes(recipientId) && userIds.length === 2) {
+            conversationId = conv.id;
+            break;
+          }
+        }
+      }
+
+      if (!conversationId) {
+        const { data: newConv } = await supabase
+          .from("conversations")
+          .insert({ is_group: false })
+          .select("id")
+          .single();
+
+        if (newConv) {
+          conversationId = newConv.id;
+
+          await supabase.from("conversation_members").insert([
+            { conversation_id: conversationId, user_id: user.id },
+            { conversation_id: conversationId, user_id: recipientId },
+          ]);
+        }
+      }
+
+      return conversationId;
+    } catch (error) {
+      console.error("Error with conversation:", error);
+      return null;
+    }
+  };
+
+  const loadChatHistory = async (recipientId: string) => {
+    if (!user) return;
+
+    try {
+      const conversationId = await getOrCreateConversation(recipientId);
+      if (!conversationId) return;
+
+      const { data: messages } = await supabase
+        .from("messages")
+        .select("id, sender_id, content, created_at, metadata")
+        .eq("conversation_id", conversationId)
+        .order("created_at", { ascending: true })
+        .limit(50);
+
+      if (messages) {
+        const formattedMessages: ChatMessage[] = messages.map((msg) => {
+          const metadata = (msg.metadata || {}) as Record<string, unknown>;
+          return {
+            id: msg.id,
+            userId: msg.sender_id,
+            username: (metadata.username as string) || "Unknown",
+            content: msg.content,
+            createdAt: msg.created_at,
+            recipientId: msg.sender_id === user.id ? recipientId : user.id,
+            fileUrl: (metadata.fileUrl as string | null) || null,
+            fileType: (metadata.fileType as string) || undefined,
+          };
+        });
+
+        setMessages(formattedMessages);
+      }
+    } catch (error) {
+      console.error("Error loading chat history:", error);
+    }
+  };
+
   const handleSendMessage = async (content: string, fileUrl?: string | null, fileType?: string) => {
     if (!content.trim() || !user) {
       return;
@@ -229,28 +341,60 @@ const LiveChat = () => {
       return;
     }
 
-    const payload: ChatMessage = {
-      id: crypto.randomUUID(),
-      userId: user.id,
-      username: displayName,
-      content: content.trim(),
-      createdAt: new Date().toISOString(),
-      recipientId: selectedRecipient.id,
-      fileUrl: fileUrl,
-      fileType: fileType,
-    };
+    try {
+      const conversationId = await getOrCreateConversation(selectedRecipient.id);
+      if (!conversationId) {
+        console.error("Failed to create/get conversation");
+        return;
+      }
 
-    setMessages((prev) => {
-      const next = [...prev, payload];
-      next.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-      return next;
-    });
-    setTypingUsers((prev) => {
-      const next = new Set(prev);
-      next.delete(user.id);
-      return next;
-    });
-    await sendLiveChatMessage(payload);
+      const messageId = crypto.randomUUID();
+      const metadata = {
+        username: displayName,
+        fileUrl,
+        fileType,
+      };
+
+      const { error: dbError } = await supabase.from("messages").insert({
+        id: messageId,
+        conversation_id: conversationId,
+        sender_id: user.id,
+        content: content.trim(),
+        metadata,
+        type: fileType?.startsWith("image") ? "image" : fileType?.startsWith("video") ? "video" : fileType?.startsWith("audio") ? "audio" : "text",
+      });
+
+      if (dbError) {
+        console.error("Database error:", dbError);
+      }
+
+      const payload: ChatMessage = {
+        id: messageId,
+        userId: user.id,
+        username: displayName,
+        content: content.trim(),
+        createdAt: new Date().toISOString(),
+        recipientId: selectedRecipient.id,
+        fileUrl: fileUrl,
+        fileType: fileType,
+      };
+
+      setMessages((prev) => {
+        const next = [...prev, payload];
+        next.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        return next;
+      });
+
+      setTypingUsers((prev) => {
+        const next = new Set(prev);
+        next.delete(user.id);
+        return next;
+      });
+
+      await sendLiveChatMessage(payload);
+    } catch (error) {
+      console.error("Error sending message:", error);
+    }
   };
 
   const formatTimestamp = (value: string) => {
@@ -299,8 +443,10 @@ const LiveChat = () => {
             <aside className="rounded-3xl border border-border bg-card/60 backdrop-blur-md p-6 shadow-xl space-y-6 max-h-[600px] overflow-y-auto">
               <div className="flex items-center justify-between sticky top-0 bg-card/60 z-10">
                 <div>
-                  <h2 className="text-lg font-semibold text-white">Active Users</h2>
-                  <p className="text-xs text-muted-foreground">Currently in the conversation</p>
+                  <h2 className="text-lg font-semibold text-white">Users</h2>
+                  <p className="text-xs text-muted-foreground">
+                    {activeUsers.filter((u) => u.isOnline).length} online • {activeUsers.length} total
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
@@ -319,36 +465,54 @@ const LiveChat = () => {
                 {activeUsers.length === 0 ? (
                   <div className="text-sm text-muted-foreground">No one is online right now.</div>
                 ) : (
-                  activeUsers.map((participant) => (
-                    <button
-                      key={`${participant.id}-${participant.username}`}
-                      type="button"
-                      onClick={() => {
-                        if (!participant.isSelf) {
-                          setSelectedRecipient(participant);
-                        }
-                      }}
-                      className={`flex w-full items-center gap-3 rounded-2xl border border-border/60 bg-background/40 px-3 py-2 transition hover:border-primary/60 hover:bg-background/70 ${
-                        selectedRecipient?.id === participant.id ? "border-primary/60" : ""
-                      } ${participant.isSelf ? "opacity-60" : ""}`}
-                      disabled={participant.isSelf}
-                    >
-                      <Avatar className="h-9 w-9 border border-border/60">
-                        <AvatarImage src={participant.avatarUrl ?? undefined} />
-                        <AvatarFallback>{participant.username.charAt(0).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex flex-col text-left">
-                        <span className="text-sm font-medium text-white">{participant.username}</span>
-                        {participant.isSelf ? (
-                          <span className="text-xs text-primary">You</span>
-                        ) : selectedRecipient?.id === participant.id ? (
-                          <span className="text-xs text-primary">Selected</span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">Tap to chat</span>
-                        )}
-                      </div>
-                    </button>
-                  ))
+                  activeUsers
+                    .sort((a, b) => {
+                      if (a.isSelf) return 1;
+                      if (b.isSelf) return -1;
+                      if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1;
+                      return a.username.localeCompare(b.username);
+                    })
+                    .map((participant) => (
+                      <button
+                        key={`${participant.id}-${participant.username}`}
+                        type="button"
+                        onClick={() => {
+                          if (!participant.isSelf) {
+                            setSelectedRecipient(participant);
+                          }
+                        }}
+                        className={`flex w-full items-center gap-3 rounded-2xl border border-border/60 bg-background/40 px-3 py-2 transition hover:border-primary/60 hover:bg-background/70 ${
+                          selectedRecipient?.id === participant.id ? "border-primary/60" : ""
+                        } ${participant.isSelf ? "opacity-60" : ""}`}
+                        disabled={participant.isSelf}
+                      >
+                        <div className="relative">
+                          <Avatar className="h-9 w-9 border border-border/60">
+                            <AvatarImage src={participant.avatarUrl ?? undefined} />
+                            <AvatarFallback>{participant.username.charAt(0).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          {!participant.isSelf && (
+                            <span
+                              className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border border-background ${
+                                participant.isOnline ? "bg-emerald-400" : "bg-gray-500"
+                              }`}
+                            />
+                          )}
+                        </div>
+                        <div className="flex flex-col text-left">
+                          <span className="text-sm font-medium text-white">{participant.username}</span>
+                          {participant.isSelf ? (
+                            <span className="text-xs text-primary">You</span>
+                          ) : selectedRecipient?.id === participant.id ? (
+                            <span className="text-xs text-primary">Selected</span>
+                          ) : participant.isOnline ? (
+                            <span className="text-xs text-emerald-400">Online</span>
+                          ) : (
+                            <span className="text-xs text-gray-400">Offline</span>
+                          )}
+                        </div>
+                      </button>
+                    ))
                 )}
               </div>
 
