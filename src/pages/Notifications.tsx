@@ -66,14 +66,25 @@ const Notifications = () => {
   const fetchNotifications = async () => {
     try {
       setIsFetching(true);
-      const { data, error } = await supabase
+      let query = supabase
         .from("notifications")
-        .select("id, type, created_at, is_read, actor_user_id, post_id, comment_id, notification_subtype")
         .eq("user_id", user?.id)
         .order("created_at", { ascending: false })
         .limit(100);
 
-      if (error) throw error;
+      const selectColumns = ["id", "type", "created_at", "is_read", "actor_user_id", "post_id", "comment_id"];
+      
+      query = query.select(selectColumns.join(", "));
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error("Notification fetch error:", error);
+        if (error.code === "42703") {
+          console.log("notification_subtype column doesn't exist yet - trying without it");
+        }
+        throw error;
+      }
 
       if (data && data.length > 0) {
         const actorIds = Array.from(new Set(data.map((notification) => notification.actor_user_id).filter(Boolean))) as string[];
@@ -99,14 +110,14 @@ const Notifications = () => {
         const loginDetailsMap = new Map<string, LoginDetails>();
 
         if (loginNotifications.length > 0 && user?.id) {
-          const { data: loginData, error: loginError } = await supabase
+          const { data: loginData } = await supabase
             .from("login_history")
             .select("country, city, ip_address, device_name, browser_name, os_name, logged_in_at")
             .eq("user_id", user.id)
             .order("logged_in_at", { ascending: false })
             .limit(loginNotifications.length);
 
-          if (!loginError && loginData) {
+          if (loginData) {
             loginData.forEach((login, idx) => {
               if (loginNotifications[idx]) {
                 loginDetailsMap.set(loginNotifications[idx].id, login as LoginDetails);

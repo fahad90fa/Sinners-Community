@@ -27,6 +27,7 @@ const migrationFiles = [
   "supabase/migrations/20251025_fix_rls_policy.sql",
   "supabase/migrations/20251025_add_group_chat_rls.sql",
   "supabase/migrations/20251025_enhance_login_notifications.sql",
+  "supabase/migrations/20251025_add_notification_subtype.sql",
 ];
 
 async function runMigrations() {
