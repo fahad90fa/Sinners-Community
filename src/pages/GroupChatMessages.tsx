@@ -175,11 +175,21 @@ const GroupChatMessages = () => {
     setSendingMessage(true);
     try {
       const messageId = crypto.randomUUID();
+      
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("username, avatar_url")
+        .eq("id", user.id)
+        .single();
+
+      const senderName = profileData?.username || user.user_metadata?.username || user.email || "Unknown";
+      const senderAvatar = profileData?.avatar_url || null;
+
       const newMessage: GroupMessage = {
         id: messageId,
         sender_id: user.id,
-        sender_name: user.user_metadata?.username || user.email || "Unknown",
-        sender_avatar: user.user_metadata?.avatar_url || null,
+        sender_name: senderName,
+        sender_avatar: senderAvatar,
         content: messageInput.trim(),
         created_at: new Date().toISOString(),
       };
@@ -206,7 +216,8 @@ const GroupChatMessages = () => {
       setMessages((prev) => [...prev, newMessage]);
       setMessageInput("");
     } catch (error) {
-      console.error("Error sending message:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("Error sending message:", errorMessage);
     } finally {
       setSendingMessage(false);
     }

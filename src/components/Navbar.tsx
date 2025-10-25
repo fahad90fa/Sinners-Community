@@ -1,12 +1,36 @@
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Home, Search, PlusSquare, Heart, User, LogOut, MessageCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { supabase } from "@/integrations/supabase/client";
 
 const Navbar = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchUserAvatar = async () => {
+      if (!user) {
+        setAvatarUrl(null);
+        return;
+      }
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("avatar_url")
+          .eq("id", user.id)
+          .single();
+        setAvatarUrl(data?.avatar_url || null);
+      } catch (error) {
+        console.error("Error fetching avatar:", error);
+      }
+    };
+    
+    void fetchUserAvatar();
+  }, [user]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -62,7 +86,7 @@ const Navbar = () => {
             <>
               <Link to="/profile" className="hidden md:block">
                 <Avatar className="h-8 w-8 border-2 border-primary">
-                  <AvatarImage src={user.user_metadata?.avatar_url} />
+                  <AvatarImage src={avatarUrl ?? undefined} />
                   <AvatarFallback>{user.email?.[0].toUpperCase()}</AvatarFallback>
                 </Avatar>
               </Link>
