@@ -24,7 +24,7 @@ const migrationFiles = [
   "supabase/migrations/20251022115430_live_chat.sql",
   "supabase/migrations/20251024_add_social_features.sql",
   "supabase/migrations/20251024_complete_features.sql",
-  "supabase/migrations/20251025_fix_conversation_creation.sql",
+  "supabase/migrations/20251025_fix_rls_policy.sql",
 ];
 
 async function runMigrations() {
