@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import ChatInput from "@/components/ChatInput";
+import MessageRenderer from "@/components/MessageRenderer";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -21,6 +22,8 @@ interface ChatMessage {
   content: string;
   createdAt: string;
   recipientId: string | null;
+  fileUrl?: string | null;
+  fileType?: string;
 }
 
 interface ActiveUser {
@@ -217,7 +220,7 @@ const LiveChat = () => {
     });
   }, [messages, selectedRecipient, user?.id]);
 
-  const handleSendMessage = async (content: string, _fileUrl?: string | null, _fileType?: string) => {
+  const handleSendMessage = async (content: string, fileUrl?: string | null, fileType?: string) => {
     if (!content.trim() || !user) {
       return;
     }
@@ -233,6 +236,8 @@ const LiveChat = () => {
       content: content.trim(),
       createdAt: new Date().toISOString(),
       recipientId: selectedRecipient.id,
+      fileUrl: fileUrl,
+      fileType: fileType,
     };
 
     setMessages((prev) => {
@@ -404,7 +409,13 @@ const LiveChat = () => {
                             }`}
                           >
                             <div className="text-xs uppercase tracking-wide text-white/70">{message.username}</div>
-                            <div className="mt-2 text-sm leading-relaxed break-words">{message.content}</div>
+                            <div className="mt-2 text-sm leading-relaxed break-words">
+                              <MessageRenderer 
+                                content={message.content}
+                                fileUrl={message.fileUrl}
+                                fileType={message.fileType}
+                              />
+                            </div>
                             <div className="mt-2 text-[10px] uppercase tracking-wide text-white/50">
                               {formatTimestamp(message.createdAt)}
                             </div>

@@ -15,14 +15,19 @@ const MessageRenderer = ({ content, fileUrl, fileType }: MessageRendererProps) =
   const isVoiceMessage = content.includes("[Voice Message");
   const isFile = content.includes("[File:");
 
-  const handlePlayPause = () => {
+  const handlePlayPause = async () => {
     if (!audioRef) return;
-    if (isPlaying) {
-      audioRef.pause();
-    } else {
-      audioRef.play();
+    try {
+      if (isPlaying) {
+        audioRef.pause();
+        setIsPlaying(false);
+      } else {
+        await audioRef.play();
+        setIsPlaying(true);
+      }
+    } catch (error) {
+      console.error("Audio playback error:", error);
     }
-    setIsPlaying(!isPlaying);
   };
 
   const handleAudioEnded = () => {

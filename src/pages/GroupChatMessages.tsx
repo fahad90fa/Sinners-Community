@@ -97,7 +97,7 @@ const GroupChatMessages = () => {
 
         const { data: messagesData, error: messagesError } = await supabase
           .from("group_messages")
-          .select("id, user_id, content, created_at")
+          .select("id, user_id, content, created_at, file_url, file_type")
           .eq("group_chat_id", groupId)
           .order("created_at", { ascending: true })
           .limit(50);
@@ -121,6 +121,8 @@ const GroupChatMessages = () => {
             sender_avatar: profile?.avatar_url || null,
             content: msg.content,
             created_at: msg.created_at,
+            file_url: msg.file_url,
+            file_type: msg.file_type,
           };
         });
 
@@ -204,6 +206,8 @@ const GroupChatMessages = () => {
           group_chat_id: groupId,
           user_id: user.id,
           content: content,
+          file_url: fileUrl,
+          file_type: fileType,
         });
 
       if (error) throw error;
