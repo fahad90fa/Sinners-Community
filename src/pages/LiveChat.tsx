@@ -495,7 +495,7 @@ const LiveChat = () => {
                 <div>
                   <h2 className="text-lg font-semibold text-white">Users</h2>
                   <p className="text-xs text-muted-foreground">
-                    {activeUsers.filter((u) => u.isOnline).length} online • {activeUsers.length} total
+                    {activeUsers.filter((u) => !u.isSelf && u.isOnline).length} online • {activeUsers.filter((u) => !u.isSelf).length} total
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -516,9 +516,8 @@ const LiveChat = () => {
                   <div className="text-sm text-muted-foreground">No one is online right now.</div>
                 ) : (
                   activeUsers
+                    .filter((u) => !u.isSelf)
                     .sort((a, b) => {
-                      if (a.isSelf) return 1;
-                      if (b.isSelf) return -1;
                       if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1;
                       return a.username.localeCompare(b.username);
                     })
@@ -527,33 +526,26 @@ const LiveChat = () => {
                         key={`${participant.id}-${participant.username}`}
                         type="button"
                         onClick={() => {
-                          if (!participant.isSelf) {
-                            setSelectedRecipient(participant);
-                          }
+                          setSelectedRecipient(participant);
                         }}
                         className={`flex w-full items-center gap-3 rounded-2xl border border-border/60 bg-background/40 px-3 py-2 transition hover:border-primary/60 hover:bg-background/70 ${
                           selectedRecipient?.id === participant.id ? "border-primary/60" : ""
-                        } ${participant.isSelf ? "opacity-60" : ""}`}
-                        disabled={participant.isSelf}
+                        }`}
                       >
                         <div className="relative">
                           <Avatar className="h-9 w-9 border border-border/60">
                             <AvatarImage src={participant.avatarUrl ?? undefined} />
                             <AvatarFallback>{participant.username.charAt(0).toUpperCase()}</AvatarFallback>
                           </Avatar>
-                          {!participant.isSelf && (
-                            <span
-                              className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border border-background ${
-                                participant.isOnline ? "bg-emerald-400" : "bg-gray-500"
-                              }`}
-                            />
-                          )}
+                          <span
+                            className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border border-background ${
+                              participant.isOnline ? "bg-emerald-400" : "bg-gray-500"
+                            }`}
+                          />
                         </div>
                         <div className="flex flex-col text-left">
                           <span className="text-sm font-medium text-white">{participant.username}</span>
-                          {participant.isSelf ? (
-                            <span className="text-xs text-primary">You</span>
-                          ) : selectedRecipient?.id === participant.id ? (
+                          {selectedRecipient?.id === participant.id ? (
                             <span className="text-xs text-primary">Selected</span>
                           ) : participant.isOnline ? (
                             <span className="text-xs text-emerald-400">Online</span>
