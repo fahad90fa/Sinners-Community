@@ -94,7 +94,7 @@ const GroupChatMessages = () => {
         });
 
         const { data: messagesData, error: messagesError } = await supabase
-          .from("group_chat_messages")
+          .from("group_messages")
           .select("id, sender_id, content, created_at")
           .eq("group_chat_id", groupId)
           .order("created_at", { ascending: true })
@@ -195,7 +195,7 @@ const GroupChatMessages = () => {
       };
 
       const { error } = await supabase
-        .from("group_chat_messages")
+        .from("group_messages")
         .insert({
           id: messageId,
           group_chat_id: groupId,
