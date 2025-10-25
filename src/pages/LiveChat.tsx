@@ -3,9 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { MessageCircle, Users } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import ChatInput from "@/components/ChatInput";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -39,7 +39,6 @@ const LiveChat = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [messageInput, setMessageInput] = useState("");
   const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
   const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
   const [selectedRecipient, setSelectedRecipient] = useState<ActiveUser | null>(null);
@@ -218,30 +217,8 @@ const LiveChat = () => {
     });
   }, [messages, selectedRecipient, user?.id]);
 
-  const handleTyping = async (text: string) => {
-    setMessageInput(text);
-
-    if (!user || !channelRef.current) {
-      return;
-    }
-
-    try {
-      await channelRef.current.send({
-        type: "broadcast",
-        event: "typing",
-        payload: {
-          userId: user.id,
-        },
-      });
-    } catch (error) {
-      console.error("Error sending typing indicator:", error);
-    }
-  };
-
-  const handleSendMessage = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (!messageInput.trim() || !user) {
+  const handleSendMessage = async (content: string, _fileUrl?: string | null, _fileType?: string) => {
+    if (!content.trim() || !user) {
       return;
     }
 
@@ -253,7 +230,7 @@ const LiveChat = () => {
       id: crypto.randomUUID(),
       userId: user.id,
       username: displayName,
-      content: messageInput.trim(),
+      content: content.trim(),
       createdAt: new Date().toISOString(),
       recipientId: selectedRecipient.id,
     };
@@ -263,7 +240,6 @@ const LiveChat = () => {
       next.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
       return next;
     });
-    setMessageInput("");
     setTypingUsers((prev) => {
       const next = new Set(prev);
       next.delete(user.id);
@@ -449,23 +425,11 @@ const LiveChat = () => {
                 <div ref={bottomRef} />
               </div>
 
-              <form onSubmit={handleSendMessage} className="flex gap-3">
-                <Input
-                  value={messageInput}
-                  onChange={(event) => setMessageInput(event.target.value)}
-                  placeholder={selectedRecipient ? "Type your message..." : "Select a user first"}
-                  className="bg-background/80 text-white"
-                  disabled={!selectedRecipient}
-                />
-                <Button
-                  type="submit"
-                  variant="gradient"
-                  className="min-w-[120px]"
-                  disabled={!messageInput.trim() || !selectedRecipient}
-                >
-                  Send
-                </Button>
-              </form>
+              <ChatInput
+                onSendMessage={handleSendMessage}
+                isLoading={false}
+                placeholder={selectedRecipient ? "Type your message..." : "Select a user first"}
+              />
             </section>
           </div>
         </div>

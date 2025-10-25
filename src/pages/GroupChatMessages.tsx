@@ -3,9 +3,9 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Users } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
+import ChatInput from "@/components/ChatInput";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -39,7 +39,6 @@ const GroupChatMessages = () => {
   
   const [groupChat, setGroupChat] = useState<GroupChatData | null>(null);
   const [messages, setMessages] = useState<GroupMessage[]>([]);
-  const [messageInput, setMessageInput] = useState("");
   const [loadingData, setLoadingData] = useState(true);
   const [sendingMessage, setSendingMessage] = useState(false);
   
@@ -168,9 +167,8 @@ const GroupChatMessages = () => {
     }
   }, [messages]);
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!messageInput.trim() || !user || !groupId || sendingMessage) return;
+  const handleSendMessage = async (content: string, fileUrl?: string | null, fileType?: string) => {
+    if (!content.trim() || !user || !groupId || sendingMessage) return;
 
     setSendingMessage(true);
     try {
@@ -185,12 +183,19 @@ const GroupChatMessages = () => {
       const senderName = profileData?.username || user.user_metadata?.username || user.email || "Unknown";
       const senderAvatar = profileData?.avatar_url || null;
 
+      let messageContent = content;
+      if (fileUrl && fileType?.startsWith("voice")) {
+        messageContent = "[Voice Message]";
+      } else if (fileUrl) {
+        messageContent = content;
+      }
+
       const newMessage: GroupMessage = {
         id: messageId,
         sender_id: user.id,
         sender_name: senderName,
         sender_avatar: senderAvatar,
-        content: messageInput.trim(),
+        content: messageContent,
         created_at: new Date().toISOString(),
       };
 
@@ -200,7 +205,7 @@ const GroupChatMessages = () => {
           id: messageId,
           group_chat_id: groupId,
           user_id: user.id,
-          content: messageInput.trim(),
+          content: messageContent,
         });
 
       if (error) throw error;
@@ -214,7 +219,6 @@ const GroupChatMessages = () => {
       }
 
       setMessages((prev) => [...prev, newMessage]);
-      setMessageInput("");
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("Error sending message:", errorMessage);
@@ -297,23 +301,11 @@ const GroupChatMessages = () => {
                 <div ref={bottomRef} />
               </div>
 
-              <form onSubmit={handleSendMessage} className="flex gap-3">
-                <Input
-                  value={messageInput}
-                  onChange={(e) => setMessageInput(e.target.value)}
-                  placeholder="Type your message..."
-                  className="bg-background/80 text-white"
-                  disabled={sendingMessage}
-                />
-                <Button
-                  type="submit"
-                  variant="gradient"
-                  className="min-w-[120px]"
-                  disabled={!messageInput.trim() || sendingMessage}
-                >
-                  Send
-                </Button>
-              </form>
+              <ChatInput
+                onSendMessage={handleSendMessage}
+                isLoading={sendingMessage}
+                placeholder="Type your message..."
+              />
             </Card>
           </div>
 
