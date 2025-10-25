@@ -20,6 +20,7 @@ import Saved from "./pages/Saved";
 import HashtagExplore from "./pages/HashtagExplore";
 import Drafts from "./pages/Drafts";
 import GroupChats from "./pages/GroupChats";
+import GroupChatMessages from "./pages/GroupChatMessages";
 import CreatorDashboard from "./pages/CreatorDashboard";
 import NotFound from "./pages/NotFound";
 
@@ -66,7 +67,7 @@ const AppRoutes = () => {
         <Route path="/create" element={<Create />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/chat" element={<LiveChat />} />
-        <Route path="/messages" element={<LiveChat />} />
+        <Route path="/messages" element={<GroupChatMessages />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/drafts" element={<Drafts />} />

@@ -86,14 +86,12 @@ const Signup = () => {
     setLoading(true);
     
     try {
-      const { error } = await signUp(email, password, username);
+      const { error, user: authUser } = await signUp(email, password, username);
       
       if (error) {
         throw error;
       }
 
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      
       if (authUser) {
         let avatarUrl = null;
 
@@ -118,15 +116,18 @@ const Signup = () => {
           avatarUrl = publicUrlData.publicUrl;
         }
 
+        const profileData = {
+          id: authUser.id,
+          username: username.trim(),
+          display_name: displayName.trim() || username,
+          bio: bio.trim() || null,
+          avatar_url: avatarUrl,
+          updated_at: new Date().toISOString(),
+        };
+
         const { error: profileError } = await supabase
           .from("profiles")
-          .update({
-            display_name: displayName.trim() || username,
-            bio: bio.trim() || null,
-            avatar_url: avatarUrl,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", authUser.id);
+          .upsert(profileData, { onConflict: "id" });
 
         if (profileError) {
           throw profileError;
