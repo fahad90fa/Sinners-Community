@@ -155,35 +155,31 @@ const ChatInput = ({ onSendMessage, isLoading = false, placeholder = "Type a mes
   };
 
   return (
-    <form onSubmit={handleSendMessage} className="flex gap-3 items-end">
-      <div className="flex-1 flex gap-2 items-end">
-        <div className="relative flex-1">
-          <Input
-            value={messageInput}
-            onChange={(e) => setMessageInput(e.target.value)}
-            placeholder={placeholder}
-            className="bg-background/80 text-white pr-10"
+    <form onSubmit={handleSendMessage} className="flex flex-col gap-2">
+      <div className="flex gap-2 items-end">
+        <Input
+          value={messageInput}
+          onChange={(e) => setMessageInput(e.target.value)}
+          placeholder={placeholder}
+          className="bg-background/80 text-white flex-1"
+          disabled={isLoading || uploadingFile || isRecording}
+        />
+
+        <div className="relative" ref={emojiPickerRef}>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            onClick={() => setShowEmoji(!showEmoji)}
             disabled={isLoading || uploadingFile || isRecording}
-          />
-          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
-            <div className="relative" ref={emojiPickerRef}>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="h-6 w-6"
-                onClick={() => setShowEmoji(!showEmoji)}
-                disabled={isLoading || uploadingFile || isRecording}
-              >
-                <Smile className="h-4 w-4" />
-              </Button>
-              {showEmoji && (
-                <div className="absolute bottom-full right-0 mb-2 z-50">
-                  <EmojiPicker onEmojiClick={handleEmojiClick} height={300} width={300} />
-                </div>
-              )}
+          >
+            <Smile className="h-5 w-5" />
+          </Button>
+          {showEmoji && (
+            <div className="absolute bottom-full right-0 mb-2 z-50">
+              <EmojiPicker onEmojiClick={handleEmojiClick} height={300} width={300} />
             </div>
-          </div>
+          )}
         </div>
 
         <input
@@ -224,16 +220,16 @@ const ChatInput = ({ onSendMessage, isLoading = false, placeholder = "Type a mes
             <Mic className="h-5 w-5" />
           </Button>
         )}
-      </div>
 
-      <Button
-        type="submit"
-        variant="gradient"
-        className="min-w-[100px]"
-        disabled={!messageInput.trim() || isLoading || uploadingFile || isRecording}
-      >
-        {isRecording ? "Recording..." : uploadingFile ? "Uploading..." : "Send"}
-      </Button>
+        <Button
+          type="submit"
+          variant="gradient"
+          className="min-w-[100px]"
+          disabled={!messageInput.trim() || isLoading || uploadingFile || isRecording}
+        >
+          {isRecording ? "Recording..." : uploadingFile ? "Uploading..." : "Send"}
+        </Button>
+      </div>
     </form>
   );
 };
