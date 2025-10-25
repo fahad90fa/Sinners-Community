@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { extractHashtags } from "@/utils/hashtag";
 import { extractMentions, saveMentions } from "@/utils/mentions";
+import VideoPlayer from "@/components/VideoPlayer";
 
 interface PostCardProps {
   postId: string;
@@ -684,11 +685,11 @@ const PostCard = ({
 
         <div className="relative aspect-square w-full bg-muted">
           {mediaType === "video" ? (
-            <video 
-              src={imageUrl} 
-              className="h-full w-full object-cover"
-              controls
-              controlsList="nodownload"
+            <VideoPlayer 
+              src={imageUrl}
+              alt={caption}
+              onDoubleTap={toggleLike}
+              className="h-full w-full"
             />
           ) : (
             <img src={imageUrl} alt={caption} className="h-full w-full object-cover" />

@@ -1,13 +1,16 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, Users } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
+import { getGroupChats } from "@/utils/groupChat";
+import type { GroupChat } from "@/utils/groupChat";
 
 type ConnectionState = "connecting" | "online" | "offline";
 
@@ -41,6 +44,8 @@ const LiveChat = () => {
   const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
   const [selectedRecipient, setSelectedRecipient] = useState<ActiveUser | null>(null);
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
+  const [groupChats, setGroupChats] = useState<GroupChat[]>([]);
+  const [loadingGroupChats, setLoadingGroupChats] = useState(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -67,8 +72,23 @@ const LiveChat = () => {
   }, [user]);
 
   useEffect(() => {
+    const loadGroupChats = async () => {
+      if (!user) return;
+      try {
+        setLoadingGroupChats(true);
+        const data = await getGroupChats(user.id);
+        setGroupChats(data);
+      } catch (error) {
+        console.error("Error loading group chats:", error);
+      } finally {
+        setLoadingGroupChats(false);
+      }
+    };
+
     if (!loading && !user) {
       navigate("/login");
+    } else if (user) {
+      void loadGroupChats();
     }
   }, [loading, user, navigate]);
 
@@ -295,8 +315,8 @@ const LiveChat = () => {
             <p className="text-muted-foreground">Connect with the community in real time.</p>
           </div>
           <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
-            <aside className="rounded-3xl border border-border bg-card/60 backdrop-blur-md p-6 shadow-xl space-y-6">
-              <div className="flex items-center justify-between">
+            <aside className="rounded-3xl border border-border bg-card/60 backdrop-blur-md p-6 shadow-xl space-y-6 max-h-[600px] overflow-y-auto">
+              <div className="flex items-center justify-between sticky top-0 bg-card/60 z-10">
                 <div>
                   <h2 className="text-lg font-semibold text-white">Active Users</h2>
                   <p className="text-xs text-muted-foreground">Currently in the conversation</p>
@@ -350,6 +370,36 @@ const LiveChat = () => {
                   ))
                 )}
               </div>
+
+              {groupChats.length > 0 && (
+                <>
+                  <Separator className="bg-border/40" />
+                  <div className="space-y-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        Group Chats
+                      </h3>
+                      <p className="text-xs text-muted-foreground">Your group conversations</p>
+                    </div>
+                    <div className="space-y-2">
+                      {groupChats.map((chat) => (
+                        <button
+                          key={chat.id}
+                          onClick={() => navigate(`/messages?group=${chat.id}`)}
+                          className="w-full flex items-center gap-2 rounded-2xl border border-border/60 bg-background/40 px-3 py-2 transition hover:border-primary/60 hover:bg-background/70"
+                        >
+                          <Users className="h-5 w-5 text-primary flex-shrink-0" />
+                          <div className="flex flex-col text-left min-w-0">
+                            <span className="text-sm font-medium text-white truncate">{chat.name}</span>
+                            <span className="text-xs text-muted-foreground">Group chat</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </aside>
             <section className="rounded-3xl border border-border bg-card/60 backdrop-blur-md p-6 shadow-xl space-y-6">
               <div className="flex items-center justify-between">
