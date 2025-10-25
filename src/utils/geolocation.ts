@@ -14,14 +14,14 @@ export interface DeviceInfo {
 
 export const getGeolocation = async (ip?: string): Promise<GeolocationData | null> => {
   try {
-    const response = await fetch(`https://ipapi.co/json/`);
+    const response = await fetch(`https://ipwho.is/`);
     if (!response.ok) throw new Error('Failed to fetch geolocation');
     
     const data = await response.json();
     
     return {
       ip: data.ip || 'Unknown',
-      country: data.country_name || 'Unknown',
+      country: data.country || 'Unknown',
       city: data.city || 'Unknown',
       latitude: data.latitude || 0,
       longitude: data.longitude || 0,
