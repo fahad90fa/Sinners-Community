@@ -19,6 +19,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import Saved from "./pages/Saved";
 import HashtagExplore from "./pages/HashtagExplore";
 import Drafts from "./pages/Drafts";
+import ScheduledPosts from "./pages/ScheduledPosts";
 import GroupChats from "./pages/GroupChats";
 import GroupChatMessages from "./pages/GroupChatMessages";
 import CreatorDashboard from "./pages/CreatorDashboard";
@@ -71,6 +72,7 @@ const AppRoutes = () => {
         <Route path="/profile" element={<Profile />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/drafts" element={<Drafts />} />
+        <Route path="/scheduled-posts" element={<ScheduledPosts />} />
         <Route path="/group-chats" element={<GroupChats />} />
         <Route path="/creator-dashboard" element={<CreatorDashboard />} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
